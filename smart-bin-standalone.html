@@ -1,0 +1,1859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Bin - Integrated Waste Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: 142 71% 57%;
+            --primary-light: 142 76% 73%;
+            --primary-dark: 142 71% 45%;
+            --info: 204 73% 70%;
+            --wet-waste: 142 71% 57%;
+            --dry-waste: 204 73% 70%;
+            --e-waste: 248 53% 58%;
+            --accent: 25 95% 53%;
+            --foreground: 210 11% 15%;
+            --background: 0 0% 100%;
+            --muted: 210 40% 98%;
+            --muted-foreground: 215 16% 47%;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .page { display: none; }
+        .page.active { display: block; animation: fadeIn 0.6s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .text-gradient {
+            background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        .card-hover:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .glass-card {
+            backdrop-filter: blur(10px);
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .animate-slide-up {
+            animation: slideUp 0.8s ease-out;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+        
+        .sidebar-item {
+            transition: all 0.2s ease;
+            border-left: 4px solid transparent;
+        }
+        .sidebar-item:hover {
+            background-color: hsl(var(--primary-dark));
+            color: white;
+            border-left-color: hsl(var(--accent));
+        }
+        .sidebar-item.active {
+            background-color: hsl(var(--primary));
+            color: white;
+            border-left-color: hsl(var(--accent));
+            font-weight: 600;
+        }
+        
+        .waste-item {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .waste-item:hover {
+            transform: scale(1.05);
+        }
+        .waste-item:active {
+            cursor: grabbing;
+            transform: scale(1.1);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .drop-zone {
+            border: 3px dashed #d1d5db;
+            transition: all 0.3s ease;
+        }
+        .drop-zone.drag-over {
+            border-color: hsl(var(--primary));
+            background-color: hsl(var(--primary) / 0.1);
+            transform: scale(1.02);
+        }
+        
+        .correct-drop {
+            animation: correctDrop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes correctDrop {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .wrong-drop {
+            animation: wrongDrop 0.5s ease;
+        }
+        @keyframes wrongDrop {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+        
+        .modal {
+            backdrop-filter: blur(8px);
+            background-color: rgba(0, 0, 0, 0.6);
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="text-gray-800 bg-gray-50">
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-white/70 backdrop-blur-sm z-[100] flex items-center justify-center transition-opacity duration-500">
+        <div class="flex flex-col items-center">
+            <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=64&h=64&fit=crop&crop=center" alt="Smart Bin Logo" class="w-16 h-16 rounded-full animate-pulse shadow-lg">
+            <p class="mt-4 text-lg font-semibold text-gradient">Loading Smart Bin...</p>
+        </div>
+    </div>
+
+    <!-- =========== LANDING PAGE =========== -->
+    <div id="landing-page" class="page active">
+        <div class="min-h-screen bg-cover bg-center bg-no-repeat relative" style="background-image: linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)), url('https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=1920&h=1080&fit=crop');">
+            
+            <!-- Enhanced Header -->
+            <header class="relative z-10 bg-white/95 backdrop-blur-md shadow-lg border-b">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex justify-between items-center h-20">
+                        <div class="flex items-center gap-4">
+                            <div class="relative">
+                                <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=48&h=48&fit=crop&crop=center" alt="Smart Bin Logo" class="w-12 h-12 rounded-full shadow-lg animate-float">
+                                <div class="absolute -inset-1 bg-gradient-to-r from-green-500 to-orange-500 rounded-full opacity-20 animate-pulse"></div>
+                            </div>
+                            <h1 class="text-3xl font-extrabold text-gradient">Smart Bin</h1>
+                        </div>
+                        <button id="login-nav-btn" class="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded-full shadow-lg transition-all duration-300 hover:scale-105">
+                            Login / Register
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Hero Content -->
+            <main class="relative z-10 flex-grow flex items-center justify-center text-center p-4">
+                <div class="max-w-4xl mx-auto animate-slide-up">
+                    <h2 class="text-5xl md:text-7xl font-extrabold text-white leading-tight mb-6 drop-shadow-lg">
+                        Revolutionizing Waste Management
+                    </h2>
+                    <p class="text-xl md:text-2xl text-white/90 max-w-2xl mx-auto mb-10 drop-shadow-md">
+                        A smart, integrated platform for residents, collectors, and administrators to create cleaner, greener communities together.
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                        <button id="demo-btn" class="bg-white text-green-700 hover:bg-gray-100 font-bold px-8 py-4 rounded-full text-lg shadow-xl transition-all duration-300 hover:scale-105">
+                            <i data-lucide="arrow-right" class="inline h-5 w-5 mr-2"></i>
+                            Try Demo Dashboard
+                        </button>
+                        <button id="get-started-btn" class="border-white text-white hover:bg-white/10 font-bold px-8 py-4 rounded-full text-lg shadow-xl transition-all duration-300 hover:scale-105 border-2">
+                            Get Started
+                        </button>
+                        <button id="play-game-btn" class="border-white text-white hover:bg-white/10 font-bold px-8 py-4 rounded-full text-lg shadow-xl transition-all duration-300 hover:scale-105 border-2">
+                            🎮 Play Game
+                        </button>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Role Selection Section -->
+        <section id="login-section" class="py-20 bg-gradient-to-br from-green-50 to-orange-50">
+            <div class="max-w-6xl mx-auto px-4">
+                <div class="text-center mb-16 animate-fade-in">
+                    <h2 class="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">
+                        Choose Your Role
+                    </h2>
+                    <p class="text-xl text-gray-600">
+                        Select your portal to sign in or create an account
+                    </p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <!-- Resident Card -->
+                    <div class="bg-white p-8 rounded-2xl shadow-lg text-center cursor-pointer card-hover glass-card group" data-role="resident">
+                        <div class="mb-6">
+                            <div class="w-20 h-20 mx-auto bg-gradient-to-br from-green-500 to-green-300 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                <i data-lucide="home" class="h-10 w-10 text-white"></i>
+                            </div>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-3">Resident</h3>
+                        <p class="text-gray-600">
+                            Manage pickups, file complaints, and learn about segregation
+                        </p>
+                    </div>
+
+                    <!-- Collector Card -->
+                    <div class="bg-white p-8 rounded-2xl shadow-lg text-center cursor-pointer card-hover glass-card group" data-role="collector">
+                        <div class="mb-6">
+                            <div class="w-20 h-20 mx-auto bg-gradient-to-br from-blue-500 to-blue-300 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                <i data-lucide="truck" class="h-10 w-10 text-white"></i>
+                            </div>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-3">Waste Collector</h3>
+                        <p class="text-gray-600">
+                            View routes, manage pickup requests, and update schedules
+                        </p>
+                    </div>
+
+                    <!-- Admin Card -->
+                    <div class="bg-white p-8 rounded-2xl shadow-lg text-center cursor-pointer card-hover glass-card group" data-role="admin">
+                        <div class="mb-6">
+                            <div class="w-20 h-20 mx-auto bg-gradient-to-br from-purple-500 to-purple-300 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                <i data-lucide="shield" class="h-10 w-10 text-white"></i>
+                            </div>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-3">Municipal Admin</h3>
+                        <p class="text-gray-600">
+                            Monitor operations, manage staff, and view analytics
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Login Form (Hidden Initially) -->
+                <div id="login-form-container" class="mt-12 max-w-md mx-auto hidden">
+                    <div class="bg-white p-8 rounded-2xl shadow-2xl border">
+                        <h3 id="login-title" class="text-2xl font-bold text-center text-gray-800 mb-6">Login as Resident</h3>
+                        <form id="login-form">
+                            <input type="hidden" id="selected-role">
+                            <div id="name-field" class="mb-4 hidden">
+                                <label for="name" class="block text-sm font-medium text-gray-700">Full Name</label>
+                                <input type="text" id="name" class="mt-1 w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                            </div>
+                            <div class="mb-4">
+                                <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                                <input type="email" id="email" required class="mt-1 w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                            </div>
+                            <div class="mb-6">
+                                <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                                <input type="password" id="password" required class="mt-1 w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" placeholder="Enter your password">
+                            </div>
+                            <button type="submit" id="auth-button" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition-transform transform hover:scale-105">
+                                Login
+                            </button>
+                            <div class="text-center mt-4">
+                                <p class="text-sm text-gray-600">
+                                    <span id="auth-prompt">Don't have an account?</span>
+                                    <button type="button" id="auth-toggle" class="text-green-600 hover:underline font-semibold">Register here</button>
+                                </p>
+                                <button type="button" id="back-to-roles" class="mt-2 text-gray-500 hover:text-gray-700 text-sm">Back to Role Selection</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="py-20 bg-white">
+            <div class="max-w-6xl mx-auto px-4">
+                <div class="text-center mb-16">
+                    <h2 class="text-4xl font-extrabold text-gray-900 mb-4">
+                        Smart Features for Everyone
+                    </h2>
+                    <p class="text-xl text-gray-600">
+                        Comprehensive waste management solutions powered by technology
+                    </p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div class="text-center p-6">
+                        <div class="w-16 h-16 mx-auto bg-green-500 rounded-full flex items-center justify-center mb-4">
+                            <span class="text-2xl">🌱</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">Smart Segregation</h3>
+                        <p class="text-gray-600">AI-powered waste classification guidance</p>
+                    </div>
+                    
+                    <div class="text-center p-6">
+                        <div class="w-16 h-16 mx-auto bg-blue-500 rounded-full flex items-center justify-center mb-4">
+                            <span class="text-2xl">📍</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">Real-time Tracking</h3>
+                        <p class="text-gray-600">Live updates on collection status and routes</p>
+                    </div>
+                    
+                    <div class="text-center p-6">
+                        <div class="w-16 h-16 mx-auto bg-orange-500 rounded-full flex items-center justify-center mb-4">
+                            <span class="text-2xl">📊</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">Analytics Dashboard</h3>
+                        <p class="text-gray-600">Comprehensive insights and reporting</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="bg-gray-900 text-white py-16">
+            <div class="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <div class="flex items-center gap-3 mb-4">
+                        <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=32&h=32&fit=crop&crop=center" alt="Smart Bin Logo" class="w-8 h-8 rounded-full">
+                        <h4 class="font-bold text-xl">Smart Bin</h4>
+                    </div>
+                    <p class="text-gray-300">
+                        Dedicated to fostering cleaner environments through technology, 
+                        connecting communities and waste management services seamlessly.
+                    </p>
+                </div>
+                
+                <div>
+                    <h4 class="font-bold text-lg mb-4">Contact Us</h4>
+                    <p class="text-gray-300 mb-2">123 Green Way, Pimpri-Chinchwad, MH</p>
+                    <p class="text-gray-300">Email: contact@smartbin.com</p>
+                </div>
+                
+                <div>
+                    <h4 class="font-bold text-lg mb-4">Follow Us</h4>
+                    <div class="flex gap-4">
+                        <i data-lucide="twitter" class="h-6 w-6 text-gray-300 hover:text-white cursor-pointer"></i>
+                        <i data-lucide="facebook" class="h-6 w-6 text-gray-300 hover:text-white cursor-pointer"></i>
+                        <i data-lucide="instagram" class="h-6 w-6 text-gray-300 hover:text-white cursor-pointer"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-12 pt-8 border-t border-gray-700 text-center text-gray-400">
+                &copy; 2025 Smart Bin. All Rights Reserved.
+            </div>
+        </footer>
+    </div>
+
+    <!-- =========== DEMO DASHBOARD =========== -->
+    <div id="demo-page" class="page">
+        <div class="min-h-screen bg-gradient-to-br from-green-50 to-orange-50 flex items-center justify-center p-4">
+            <div class="max-w-2xl w-full">
+                <div class="text-center mb-8">
+                    <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=64&h=64&fit=crop&crop=center" alt="Smart Bin Logo" class="w-16 h-16 mx-auto mb-4 animate-float rounded-full">
+                    <h1 class="text-3xl font-bold text-gradient mb-2">Smart Bin Demo</h1>
+                    <p class="text-gray-600">
+                        Experience different user roles in our waste management system
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-2xl shadow-lg text-center cursor-pointer card-hover" data-demo-role="resident">
+                        <div class="w-12 h-12 mx-auto bg-green-500 rounded-full flex items-center justify-center mb-4">
+                            <span class="text-white text-xl">🏠</span>
+                        </div>
+                        <h3 class="font-bold text-lg mb-2">Resident</h3>
+                        <p class="text-sm text-gray-600 mb-4">
+                            Request pickups, track schedule, play segregation game
+                        </p>
+                        <button class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">Enter as Resident</button>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-2xl shadow-lg text-center cursor-pointer card-hover" data-demo-role="collector">
+                        <div class="w-12 h-12 mx-auto bg-blue-500 rounded-full flex items-center justify-center mb-4">
+                            <span class="text-white text-xl">🚛</span>
+                        </div>
+                        <h3 class="font-bold text-lg mb-2">Collector</h3>
+                        <p class="text-sm text-gray-600 mb-4">
+                            Manage routes, view requests, track collections
+                        </p>
+                        <button class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Enter as Collector</button>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-2xl shadow-lg text-center cursor-pointer card-hover" data-demo-role="admin">
+                        <div class="w-12 h-12 mx-auto bg-purple-500 rounded-full flex items-center justify-center mb-4">
+                            <span class="text-white text-xl">👑</span>
+                        </div>
+                        <h3 class="font-bold text-lg mb-2">Admin</h3>
+                        <p class="text-sm text-gray-600 mb-4">
+                            Manage staff, view analytics, approve residents
+                        </p>
+                        <button class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">Enter as Admin</button>
+                    </div>
+                </div>
+
+                <div class="text-center mt-8">
+                    <p class="text-sm text-gray-600 mb-4">
+                        This is a demo showcasing the complete Smart Bin system. In production, users would authenticate with their credentials.
+                    </p>
+                    <button id="back-to-landing" class="text-green-600 hover:underline">← Back to Landing Page</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========== DASHBOARD PAGES =========== -->
+    <div id="dashboard-page" class="page">
+        <div class="flex h-screen bg-gray-50">
+            <!-- Sidebar -->
+            <div id="sidebar" class="w-64 bg-green-700 text-green-100 flex flex-col p-4 shadow-2xl">
+                <div class="flex items-center gap-3 p-3 mb-6">
+                    <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=40&h=40&fit=crop&crop=center" alt="Smart Bin Logo" class="w-10 h-10 rounded-full">
+                    <span class="text-xl font-bold text-white">Smart Bin</span>
+                </div>
+                <nav id="sidebar-nav" class="flex flex-col gap-2">
+                    <!-- Navigation items will be populated by JavaScript -->
+                </nav>
+                <div class="mt-auto">
+                    <div class="p-3 text-sm">
+                        <p id="user-name" class="font-semibold text-white"></p>
+                        <p id="user-email" class="text-green-200"></p>
+                    </div>
+                    <button id="logout-btn" class="w-full sidebar-item p-3 rounded-lg flex items-center gap-3 text-left hover:bg-green-600">
+                        <i data-lucide="log-out" class="h-4 w-4"></i> Logout
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Main Content -->
+            <main id="main-content" class="flex-1 p-8 overflow-y-auto">
+                <!-- Content will be populated by JavaScript -->
+            </main>
+        </div>
+    </div>
+
+    <!-- =========== SEGREGATION GAME MODAL =========== -->
+    <div id="game-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 modal">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-y-auto relative">
+            <button id="close-game" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10">
+                <i data-lucide="x" class="h-6 w-6"></i>
+            </button>
+            
+            <div class="p-6">
+                <div class="text-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-2">🎮 Waste Segregation Challenge</h3>
+                    <p class="text-gray-600">Drag and drop waste items into the correct bins • Score: <span id="game-score">0</span> points</p>
+                </div>
+
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex items-center gap-4">
+                        <img src="https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=64&h=64&fit=crop" alt="Waste Segregation Guide" class="w-16 h-16 rounded-lg object-cover">
+                        <div>
+                            <h3 class="font-semibold">Items Remaining: <span id="items-count">8</span></h3>
+                            <p id="game-status" class="text-sm text-gray-600">Drag items to the correct bins</p>
+                        </div>
+                    </div>
+                    <button id="reset-game" class="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+                        <i data-lucide="rotate-ccw" class="h-4 w-4"></i>
+                        Reset Game
+                    </button>
+                </div>
+
+                <div id="game-feedback" class="mb-6 p-4 bg-gray-100 rounded-lg text-center font-medium hidden"></div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <!-- Waste Items -->
+                    <div class="lg:col-span-1">
+                        <h3 class="font-semibold mb-4 text-center">Items to Sort</h3>
+                        <div id="waste-items" class="space-y-3 max-h-96 overflow-y-auto bg-gray-50 p-4 rounded-lg">
+                            <!-- Items will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Bins -->
+                    <div class="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="drop-zone bg-green-100 border-green-300 p-6 rounded-xl border-2 border-dashed text-center h-48 flex flex-col justify-center items-center" data-bin="wet">
+                            <div class="text-4xl mb-3">🌱</div>
+                            <h4 class="text-xl font-bold mb-2 text-green-800">Wet Waste</h4>
+                            <p class="text-sm text-green-600">Organic & Biodegradable</p>
+                        </div>
+                        
+                        <div class="drop-zone bg-blue-100 border-blue-300 p-6 rounded-xl border-2 border-dashed text-center h-48 flex flex-col justify-center items-center" data-bin="dry">
+                            <div class="text-4xl mb-3">♻️</div>
+                            <h4 class="text-xl font-bold mb-2 text-blue-800">Dry Waste</h4>
+                            <p class="text-sm text-blue-600">Recyclable Materials</p>
+                        </div>
+                        
+                        <div class="drop-zone bg-red-100 border-red-300 p-6 rounded-xl border-2 border-dashed text-center h-48 flex flex-col justify-center items-center" data-bin="hazardous">
+                            <div class="text-4xl mb-3">⚠️</div>
+                            <h4 class="text-xl font-bold mb-2 text-red-800">Hazardous Waste</h4>
+                            <p class="text-sm text-red-600">Dangerous Materials</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 p-4 bg-gray-50 rounded-lg">
+                    <h4 class="font-semibold mb-2">How to Play:</h4>
+                    <ul class="text-sm text-gray-600 space-y-1">
+                        <li>• Drag waste items from the left panel to the appropriate bins</li>
+                        <li>• <span class="text-green-600 font-medium">Wet Waste:</span> Organic materials like food scraps, peels</li>
+                        <li>• <span class="text-blue-600 font-medium">Dry Waste:</span> Recyclable materials like paper, plastic, metal</li>
+                        <li>• <span class="text-red-600 font-medium">Hazardous Waste:</span> Batteries, chemicals, electronic waste</li>
+                        <li>• Get 10 points for each correct placement!</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-5 right-5 z-[101] hidden">
+        <!-- Toast content will be populated by JavaScript -->
+    </div>
+
+    <script>
+        // Global variables
+        let currentUser = null;
+        let currentRole = null;
+        let isRegisterMode = false;
+        let gameScore = 0;
+        let gameItems = [];
+
+        // Waste items for the game
+        const wasteItems = [
+            { id: 1, name: "Apple Core", type: "wet", emoji: "🍎" },
+            { id: 2, name: "Plastic Bottle", type: "dry", emoji: "🍼" },
+            { id: 3, name: "Used Battery", type: "hazardous", emoji: "🔋" },
+            { id: 4, name: "Cardboard Box", type: "dry", emoji: "📦" },
+            { id: 5, name: "Egg Shells", type: "wet", emoji: "🥚" },
+            { id: 6, name: "Paint Can", type: "hazardous", emoji: "🎨" },
+            { id: 7, name: "Newspaper", type: "dry", emoji: "📰" },
+            { id: 8, name: "Banana Peel", type: "wet", emoji: "🍌" }
+        ];
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            // Hide loading overlay
+            setTimeout(() => {
+                const overlay = document.getElementById('loading-overlay');
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.style.display = 'none', 500);
+            }, 1000);
+
+            // Initialize Lucide icons
+            lucide.createIcons();
+
+            // Setup event listeners
+            setupEventListeners();
+            
+            // Initialize game
+            setupSegregationGame();
+        });
+
+        function setupEventListeners() {
+            // Navigation buttons
+            document.getElementById('login-nav-btn').addEventListener('click', scrollToLogin);
+            document.getElementById('get-started-btn').addEventListener('click', scrollToLogin);
+            document.getElementById('demo-btn').addEventListener('click', () => showPage('demo-page'));
+            document.getElementById('play-game-btn').addEventListener('click', showGameModal);
+            document.getElementById('back-to-landing').addEventListener('click', () => showPage('landing-page'));
+
+            // Role selection
+            document.querySelectorAll('[data-role]').forEach(card => {
+                card.addEventListener('click', () => selectRole(card.dataset.role));
+            });
+
+            // Demo role selection
+            document.querySelectorAll('[data-demo-role]').forEach(card => {
+                card.addEventListener('click', () => enterDemoRole(card.dataset.demoRole));
+            });
+
+            // Login form
+            document.getElementById('login-form').addEventListener('submit', handleLogin);
+            document.getElementById('auth-toggle').addEventListener('click', toggleAuthMode);
+            document.getElementById('back-to-roles').addEventListener('click', hideLoginForm);
+
+            // Game modal
+            document.getElementById('close-game').addEventListener('click', hideGameModal);
+            document.getElementById('reset-game').addEventListener('click', resetGame);
+
+            // Logout
+            document.getElementById('logout-btn').addEventListener('click', logout);
+        }
+
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+        }
+
+        function scrollToLogin() {
+            document.getElementById('login-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function selectRole(role) {
+            document.getElementById('selected-role').value = role;
+            document.getElementById('login-title').textContent = `Login as ${role.charAt(0).toUpperCase() + role.slice(1)}`;
+            document.getElementById('email').value = `${role}@smartbin.com`;
+            document.getElementById('name').value = role === 'resident' ? 'Jane Doe' : (role === 'collector' ? 'John Smith' : 'Admin User');
+            document.getElementById('login-form-container').classList.remove('hidden');
+            document.getElementById('login-form-container').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function hideLoginForm() {
+            document.getElementById('login-form-container').classList.add('hidden');
+            document.getElementById('login-form').reset();
+            isRegisterMode = false;
+            updateAuthForm();
+        }
+
+        function toggleAuthMode() {
+            isRegisterMode = !isRegisterMode;
+            updateAuthForm();
+        }
+
+        function updateAuthForm() {
+            const nameField = document.getElementById('name-field');
+            const nameInput = document.getElementById('name');
+            const authButton = document.getElementById('auth-button');
+            const authPrompt = document.getElementById('auth-prompt');
+            const authToggle = document.getElementById('auth-toggle');
+
+            if (isRegisterMode) {
+                nameField.classList.remove('hidden');
+                nameInput.required = true;
+                authButton.textContent = 'Register';
+                authPrompt.textContent = 'Already have an account?';
+                authToggle.textContent = 'Sign in here';
+            } else {
+                nameField.classList.add('hidden');
+                nameInput.required = false;
+                authButton.textContent = 'Login';
+                authPrompt.textContent = "Don't have an account?";
+                authToggle.textContent = 'Register here';
+            }
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const role = document.getElementById('selected-role').value;
+            const email = document.getElementById('email').value;
+            const name = document.getElementById('name').value || `${role.charAt(0).toUpperCase() + role.slice(1)} User`;
+
+            if (!role) {
+                showToast('Please select a role first.', 'error');
+                return;
+            }
+
+            currentUser = { name, email };
+            currentRole = role;
+
+            showToast(isRegisterMode ? 'Registration Successful!' : 'Login Successful!');
+            showDashboard(role);
+        }
+
+        function enterDemoRole(role) {
+            currentUser = { 
+                name: role === 'resident' ? 'Jane Doe' : (role === 'collector' ? 'John Smith' : 'Admin User'),
+                email: `${role}@smartbin.com`
+            };
+            currentRole = role;
+            showDashboard(role);
+        }
+
+        function showDashboard(role) {
+            showPage('dashboard-page');
+            setupSidebar(role);
+            loadDashboardContent(role, 'dashboard');
+        }
+
+        function setupSidebar(role) {
+            const sidebarNav = document.getElementById('sidebar-nav');
+            const userName = document.getElementById('user-name');
+            const userEmail = document.getElementById('user-email');
+
+            userName.textContent = currentUser.name;
+            userEmail.textContent = currentUser.email;
+
+            const navItems = {
+                resident: [
+                    { id: 'dashboard', icon: 'layout-dashboard', text: 'Dashboard' },
+                    { id: 'request', icon: 'send', text: 'Request Pickup' },
+                    { id: 'complain', icon: 'megaphone', text: 'File Complaint' },
+                    { id: 'guide', icon: 'book-open', text: 'Segregation Guide' },
+                    { id: 'schedule', icon: 'calendar', text: 'Pickup Schedule' },
+                    { id: 'feedback', icon: 'star', text: 'Feedback' }
+                ],
+                collector: [
+                    { id: 'dashboard', icon: 'layout-dashboard', text: 'Dashboard' },
+                    { id: 'requests', icon: 'bell', text: 'Pickup Requests' },
+                    { id: 'route', icon: 'map', text: 'Assigned Route' }
+                ],
+                admin: [
+                    { id: 'dashboard', icon: 'layout-dashboard', text: 'Dashboard' },
+                    { id: 'collectors', icon: 'users', text: 'Manage Collectors' },
+                    { id: 'residents', icon: 'user-check', text: 'Approve Residents' },
+                    { id: 'tracking', icon: 'map-pin', text: 'Live Tracking' },
+                    { id: 'analytics', icon: 'pie-chart', text: 'Analytics' }
+                ]
+            };
+
+            sidebarNav.innerHTML = navItems[role].map(item => `
+                <a href="#${item.id}" class="sidebar-item p-3 rounded-lg flex items-center gap-3 ${item.id === 'dashboard' ? 'active' : ''}" data-page="${item.id}">
+                    <i data-lucide="${item.icon}" class="h-4 w-4"></i> ${item.text}
+                </a>
+            `).join('');
+
+            // Add click event listeners to nav items
+            sidebarNav.addEventListener('click', (e) => {
+                e.preventDefault();
+                const navItem = e.target.closest('.sidebar-item');
+                if (navItem) {
+                    // Update active state
+                    document.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
+                    navItem.classList.add('active');
+                    
+                    // Load content
+                    loadDashboardContent(role, navItem.dataset.page);
+                }
+            });
+
+            lucide.createIcons();
+        }
+
+        function loadDashboardContent(role, page) {
+            const mainContent = document.getElementById('main-content');
+            
+            const content = {
+                resident: {
+                    dashboard: () => `
+                        <div class="bg-white p-8 rounded-xl border shadow-sm">
+                            <h1 class="text-3xl font-bold mb-2">Welcome back, ${currentUser.name}!</h1>
+                            <p class="text-gray-600 mb-8">Here's a quick overview of your waste management activities.</p>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                <div class="bg-green-50 p-6 rounded-lg border border-green-200">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <p class="text-green-600 text-sm font-medium">This Month</p>
+                                            <p class="text-2xl font-bold text-green-800">12</p>
+                                            <p class="text-green-600 text-sm">Pickups Completed</p>
+                                        </div>
+                                        <div class="bg-green-100 p-3 rounded-full">
+                                            <i data-lucide="truck" class="h-8 w-8 text-green-600"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-blue-50 p-6 rounded-lg border border-blue-200">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <p class="text-blue-600 text-sm font-medium">Next Pickup</p>
+                                            <p class="text-2xl font-bold text-blue-800">Friday</p>
+                                            <p class="text-blue-600 text-sm">Sep 26, 2025</p>
+                                        </div>
+                                        <div class="bg-blue-100 p-3 rounded-full">
+                                            <i data-lucide="calendar" class="h-8 w-8 text-blue-600"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-orange-50 p-6 rounded-lg border border-orange-200">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <p class="text-orange-600 text-sm font-medium">Game Score</p>
+                                            <p class="text-2xl font-bold text-orange-800">850</p>
+                                            <p class="text-orange-600 text-sm">Points Earned</p>
+                                        </div>
+                                        <div class="bg-orange-100 p-3 rounded-full">
+                                            <i data-lucide="trophy" class="h-8 w-8 text-orange-600"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-gradient-to-r from-green-500 to-blue-500 p-6 rounded-lg text-white">
+                                <h3 class="text-xl font-bold mb-2">🌱 Eco Impact</h3>
+                                <p class="mb-4">Your proper waste segregation has helped save 45kg of recyclable materials this month!</p>
+                                <button onclick="showGameModal()" class="bg-white text-green-700 px-6 py-2 rounded-lg font-semibold hover:bg-gray-100">
+                                    Play Segregation Game
+                                </button>
+                            </div>
+                        </div>
+                    `,
+                    request: () => `
+                        <div class="bg-white p-8 rounded-xl border shadow-sm max-w-2xl mx-auto">
+                            <h1 class="text-3xl font-bold mb-4">Request a Waste Pickup</h1>
+                            <p class="text-gray-600 mb-6">Fill out the details below to schedule a collection.</p>
+                            
+                            <form class="space-y-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Waste Type</label>
+                                        <select class="w-full p-3 border border-gray-300 rounded-lg">
+                                            <option>Wet Waste</option>
+                                            <option>Dry Waste</option>
+                                            <option>Hazardous Waste</option>
+                                            <option>Bulk Items</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+                                        <select class="w-full p-3 border border-gray-300 rounded-lg">
+                                            <option>1 Bag</option>
+                                            <option>2-3 Bags</option>
+                                            <option>4-5 Bags</option>
+                                            <option>More than 5 Bags</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Preferred Date</label>
+                                    <input type="date" class="w-full p-3 border border-gray-300 rounded-lg">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                                    <textarea class="w-full p-3 border border-gray-300 rounded-lg" rows="3" placeholder="Enter your pickup address"></textarea>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Special Instructions</label>
+                                    <textarea class="w-full p-3 border border-gray-300 rounded-lg" rows="3" placeholder="Any special instructions for the collector"></textarea>
+                                </div>
+                                
+                                <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700">
+                                    Submit Request
+                                </button>
+                            </form>
+                        </div>
+                    `,
+                    complain: () => `
+                        <div class="bg-white p-8 rounded-xl border shadow-sm max-w-2xl mx-auto">
+                            <h1 class="text-3xl font-bold mb-4">Report Uncollected Waste</h1>
+                            <p class="text-gray-600 mb-6">Help keep our community clean by reporting areas that need attention.</p>
+                            
+                            <form class="space-y-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                                    <input type="text" class="w-full p-3 border border-gray-300 rounded-lg" placeholder="Street address or landmark">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Issue Type</label>
+                                    <select class="w-full p-3 border border-gray-300 rounded-lg">
+                                        <option>Missed Pickup</option>
+                                        <option>Overflowing Bin</option>
+                                        <option>Illegal Dumping</option>
+                                        <option>Broken Bin</option>
+                                        <option>Other</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                                    <textarea class="w-full p-3 border border-gray-300 rounded-lg" rows="4" placeholder="Describe the issue in detail"></textarea>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                                    <select class="w-full p-3 border border-gray-300 rounded-lg">
+                                        <option>Low</option>
+                                        <option>Medium</option>
+                                        <option>High</option>
+                                        <option>Urgent</option>
+                                    </select>
+                                </div>
+                                
+                                <button type="submit" class="w-full bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700">
+                                    Submit Complaint
+                                </button>
+                            </form>
+                        </div>
+                    `,
+                    guide: () => `
+                        <div class="bg-white p-8 rounded-xl border shadow-sm">
+                            <h1 class="text-3xl font-bold mb-4">Waste Segregation Guide</h1>
+                            <p class="text-gray-600 mb-8">Learn how to sort your waste correctly. It makes a huge difference!</p>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                                <div class="bg-green-50 p-6 rounded-lg border border-green-200 text-center">
+                                    <div class="text-6xl mb-4">🌱</div>
+                                    <h3 class="text-xl font-bold text-green-800 mb-3">Wet Waste</h3>
+                                    <ul class="text-sm text-green-700 text-left space-y-1">
+                                        <li>• Food scraps & peels</li>
+                                        <li>• Garden waste</li>
+                                        <li>• Egg shells</li>
+                                        <li>• Tea bags</li>
+                                    </ul>
+                                </div>
+                                
+                                <div class="bg-blue-50 p-6 rounded-lg border border-blue-200 text-center">
+                                    <div class="text-6xl mb-4">♻️</div>
+                                    <h3 class="text-xl font-bold text-blue-800 mb-3">Dry Waste</h3>
+                                    <ul class="text-sm text-blue-700 text-left space-y-1">
+                                        <li>• Paper & cardboard</li>
+                                        <li>• Plastic containers</li>
+                                        <li>• Metal cans</li>
+                                        <li>• Glass bottles</li>
+                                    </ul>
+                                </div>
+                                
+                                <div class="bg-red-50 p-6 rounded-lg border border-red-200 text-center">
+                                    <div class="text-6xl mb-4">⚠️</div>
+                                    <h3 class="text-xl font-bold text-red-800 mb-3">Hazardous</h3>
+                                    <ul class="text-sm text-red-700 text-left space-y-1">
+                                        <li>• Batteries</li>
+                                        <li>• Electronic waste</li>
+                                        <li>• Paint & chemicals</li>
+                                        <li>• Medical waste</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="text-center">
+                                <button onclick="showGameModal()" class="bg-yellow-500 text-yellow-900 font-bold py-3 px-8 rounded-full text-lg hover:bg-yellow-600 transition-all duration-300 hover:scale-105">
+                                    🎮 Play the Segregation Game!
+                                </button>
+                            </div>
+                        </div>
+                    `,
+                    schedule: () => `
+                        <div class="bg-white p-8 rounded-xl border shadow-sm">
+                            <h1 class="text-3xl font-bold mb-6">Your Pickup Schedule</h1>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                <div class="bg-green-50 p-6 rounded-lg border border-green-200">
+                                    <h3 class="text-lg font-semibold text-green-800 mb-2">Next Pickup</h3>
+                                    <p class="text-2xl font-bold text-green-900">Friday, Sep 26</p>
+                                    <p class="text-green-700">General Waste Collection</p>
+                                </div>
+                                
+                                <div class="bg-blue-50 p-6 rounded-lg border border-blue-200">
+                                    <h3 class="text-lg font-semibold text-blue-800 mb-2">Recycling Day</h3>
+                                    <p class="text-2xl font-bold text-blue-900">Monday, Sep 29</p>
+                                    <p class="text-blue-700">Dry Waste & Recyclables</p>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-gray-50 p-6 rounded-lg">
+                                <h3 class="text-lg font-semibold mb-4">Weekly Schedule</h3>
+                                <div class="space-y-2">
+                                    <div class="flex justify-between items-center p-3 bg-white rounded border">
+                                        <span class="font-medium">Monday</span>
+                                        <span class="text-blue-600">Dry Waste & Recyclables</span>
+                                    </div>
+                                    <div class="flex justify-between items-center p-3 bg-white rounded border">
+                                        <span class="font-medium">Wednesday</span>
+                                        <span class="text-red-600">Hazardous Waste (Monthly)</span>
+                                    </div>
+                                    <div class="flex justify-between items-center p-3 bg-white rounded border">
+                                        <span class="font-medium">Friday</span>
+                                        <span class="text-green-600">General & Wet Waste</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `,
+                    feedback: () => `
+                        <div class="bg-white p-8 rounded-xl border shadow-sm max-w-2xl mx-auto">
+                            <h1 class="text-3xl font-bold mb-4">Submit Feedback</h1>
+                            <p class="text-gray-600 mb-6">We value your opinion. Help us improve our services!</p>
+                            
+                            <form class="space-y-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Service Rating</label>
+                                    <div class="flex gap-2">
+                                        <button type="button" class="text-2xl text-gray-300 hover:text-yellow-400">⭐</button>
+                                        <button type="button" class="text-2xl text-gray-300 hover:text-yellow-400">⭐</button>
+                                        <button type="button" class="text-2xl text-gray-300 hover:text-yellow-400">⭐</button>
+                                        <button type="button" class="text-2xl text-gray-300 hover:text-yellow-400">⭐</button>
+                                        <button type="button" class="text-2xl text-gray-300 hover:text-yellow-400">⭐</button>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                                    <select class="w-full p-3 border border-gray-300 rounded-lg">
+                                        <option>Collection Service</option>
+                                        <option>App Experience</option>
+                                        <option>Staff Behavior</option>
+                                        <option>Cleanliness</option>
+                                        <option>Other</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Comments</label>
+                                    <textarea class="w-full p-3 border border-gray-300 rounded-lg" rows="4" placeholder="Share your thoughts and suggestions"></textarea>
+                                </div>
+                                
+                                <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700">
+                                    Submit Feedback
+                                </button>
+                            </form>
+                        </div>
+                    `
+                },
+                collector: {
+                    dashboard: () => `
+                        <div class="bg-white p-8 rounded-xl border shadow-sm">
+                            <h1 class="text-3xl font-bold mb-2">Welcome, ${currentUser.name}!</h1>
+                            <p class="text-gray-600 mb-8">Here's your collection overview for today.</p>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                                <div class="bg-blue-50 p-6 rounded-lg border border-blue-200">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <p class="text-blue-600 text-sm font-medium">Pending</p>
+                                            <p class="text-3xl font-bold text-blue-800">5</p>
+                                            <p class="text-blue-600 text-sm">Requests</p>
+                                        </div>
+                                        <div class="bg-blue-100 p-3 rounded-full">
+                                            <i data-lucide="bell" class="h-8 w-8 text-blue-600"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-green-50 p-6 rounded-lg border border-green-200">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <p class="text-green-600 text-sm font-medium">Completed</p>
+                                            <p class="text-3xl font-bold text-green-800">12</p>
+                                            <p class="text-green-600 text-sm">Today</p>
+                                        </div>
+                                        <div class="bg-green-100 p-3 rounded-full">
+                                            <i data-lucide="check-circle" class="h-8 w-8 text-green-600"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-orange-50 p-6 rounded-lg border border-orange-200">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <p class="text-orange-600 text-sm font-medium">Route</p>
+                                            <p class="text-3xl font-bold text-orange-800">65%</p>
+                                            <p class="text-orange-600 text-sm">Complete</p>
+                                        </div>
+                                        <div class="bg-orange-100 p-3 rounded-full">
+                                            <i data-lucide="map" class="h-8 w-8 text-orange-600"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-purple-50 p-6 rounded-lg border border-purple-200">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <p class="text-purple-600 text-sm font-medium">Vehicle</p>
+                                            <p class="text-xl font-bold text-purple-800">TR-101</p>
+                                            <p class="text-purple-600 text-sm">Assigned</p>
+                                        </div>
+                                        <div class="bg-purple-100 p-3 rounded-full">
+                                            <i data-lucide="truck" class="h-8 w-8 text-purple-600"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-gradient-to-r from-blue-500 to-green-500 p-6 rounded-lg text-white">
+                                <h3 class="text-xl font-bold mb-2">🚛 Today's Mission</h3>
+                                <p class="mb-4">You're assigned to Route B-7 with 17 scheduled pickups. Current efficiency: 98%!</p>
+                                <div class="flex gap-4">
+                                    <button class="bg-white text-blue-700 px-6 py-2 rounded-lg font-semibold hover:bg-gray-100">
+                                        View Route Map
+                                    </button>
+                                    <button class="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700">
+                                        Start Collection
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `,
+                    requests: () => `
+                        <div class="bg-white p-8 rounded-xl border shadow-sm">
+                            <h1 class="text-3xl font-bold mb-6">Pickup Requests</h1>
+                            
+                            <div class="space-y-4">
+                                <div class="bg-yellow-50 border border-yellow-200 p-6 rounded-lg">
+                                    <div class="flex justify-between items-start">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-3 mb-2">
+                                                <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded-full">High Priority</span>
+                                                <span class="text-sm text-gray-600">Req #1001</span>
+                                            </div>
+                                            <h3 class="font-semibold text-lg">Jane Doe</h3>
+                                            <p class="text-gray-600">123 Green Street, Block A</p>
+                                            <p class="text-sm text-gray-500">Contact: +91 98765 43210</p>
+                                            <div class="mt-2">
+                                                <span class="text-sm font-medium">Waste Type:</span> Bulk Items (5+ bags)
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-sm text-gray-600">Requested</p>
+                                            <p class="font-semibold">Today, 9:30 AM</p>
+                                            <button class="mt-2 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                                                Accept
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-blue-50 border border-blue-200 p-6 rounded-lg">
+                                    <div class="flex justify-between items-start">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-3 mb-2">
+                                                <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">Medium Priority</span>
+                                                <span class="text-sm text-gray-600">Req #1002</span>
+                                            </div>
+                                            <h3 class="font-semibold text-lg">John Smith</h3>
+                                            <p class="text-gray-600">456 Park Avenue, Block B</p>
+                                            <p class="text-sm text-gray-500">Contact: +91 87654 32109</p>
+                                            <div class="mt-2">
+                                                <span class="text-sm font-medium">Waste Type:</span> Dry Waste (2-3 bags)
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-sm text-gray-600">Requested</p>
+                                            <p class="font-semibold">Today, 11:15 AM</p>
+                                            <button class="mt-2 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                                                Accept
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-green-50 border border-green-200 p-6 rounded-lg">
+                                    <div class="flex justify-between items-start">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-3 mb-2">
+                                                <span class="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">Completed</span>
+                                                <span class="text-sm text-gray-600">Req #1000</span>
+                                            </div>
+                                            <h3 class="font-semibold text-lg">Mary Johnson</h3>
+                                            <p class="text-gray-600">789 Oak Street, Block C</p>
+                                            <p class="text-sm text-gray-500">Contact: +91 76543 21098</p>
+                                            <div class="mt-2">
+                                                <span class="text-sm font-medium">Waste Type:</span> Wet Waste (1 bag)
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-sm text-gray-600">Completed</p>
+                                            <p class="font-semibold">Today, 8:45 AM</p>
+                                            <span class="mt-2 bg-green-100 text-green-800 px-4 py-2 rounded text-sm font-medium">
+                                                ✓ Done
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `,
+                    route: () => `
+                        <div class="bg-white p-8 rounded-xl border shadow-sm">
+                            <h1 class="text-3xl font-bold mb-6">Today's Route - B7</h1>
+                            
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <div>
+                                    <img src="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=600&h=400&fit=crop" alt="Route Map" class="w-full rounded-lg shadow-lg">
+                                </div>
+                                
+                                <div>
+                                    <h3 class="text-xl font-semibold mb-4">Schedule Overview</h3>
+                                    <div class="space-y-4">
+                                        <div class="flex items-center gap-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                                            <div class="bg-green-100 p-2 rounded-full">
+                                                <i data-lucide="check-circle" class="h-6 w-6 text-green-600"></i>
+                                            </div>
+                                            <div class="flex-1">
+                                                <p class="font-semibold">Green Street (8:00-8:30 AM)</p>
+                                                <p class="text-sm text-gray-600">12 pickups completed</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="flex items-center gap-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                            <div class="bg-blue-100 p-2 rounded-full">
+                                                <i data-lucide="clock" class="h-6 w-6 text-blue-600"></i>
+                                            </div>
+                                            <div class="flex-1">
+                                                <p class="font-semibold">Park Avenue (9:00-9:45 AM)</p>
+                                                <p class="text-sm text-gray-600">5 pickups in progress</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                            <div class="bg-gray-100 p-2 rounded-full">
+                                                <i data-lucide="map-pin" class="h-6 w-6 text-gray-600"></i>
+                                            </div>
+                                            <div class="flex-1">
+                                                <p class="font-semibold">Oak Street (10:00-10:30 AM)</p>
+                                                <p class="text-sm text-gray-600">8 pickups pending</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mt-6 p-4 bg-blue-600 text-white rounded-lg">
+                                        <h4 class="font-semibold mb-2">Vehicle Info</h4>
+                                        <p>Truck: TR-101</p>
+                                        <p>Capacity: 75% filled</p>
+                                        <p>Fuel: 82%</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `
+                },
+                admin: {
+                    dashboard: () => `
+                        <div class="bg-white p-8 rounded-xl border shadow-sm">
+                            <h1 class="text-3xl font-bold mb-2">Admin Dashboard</h1>
+                            <p class="text-gray-600 mb-8">Municipal waste management system overview.</p>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                                <div class="bg-green-50 p-6 rounded-lg border border-green-200">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <p class="text-green-600 text-sm font-medium">Active Collectors</p>
+                                            <p class="text-3xl font-bold text-green-800">24</p>
+                                            <p class="text-green-600 text-sm">On Duty</p>
+                                        </div>
+                                        <div class="bg-green-100 p-3 rounded-full">
+                                            <i data-lucide="users" class="h-8 w-8 text-green-600"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-blue-50 p-6 rounded-lg border border-blue-200">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <p class="text-blue-600 text-sm font-medium">Residents</p>
+                                            <p class="text-3xl font-bold text-blue-800">1,247</p>
+                                            <p class="text-blue-600 text-sm">Registered</p>
+                                        </div>
+                                        <div class="bg-blue-100 p-3 rounded-full">
+                                            <i data-lucide="home" class="h-8 w-8 text-blue-600"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-orange-50 p-6 rounded-lg border border-orange-200">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <p class="text-orange-600 text-sm font-medium">Daily Waste</p>
+                                            <p class="text-3xl font-bold text-orange-800">15.2</p>
+                                            <p class="text-orange-600 text-sm">Tons</p>
+                                        </div>
+                                        <div class="bg-orange-100 p-3 rounded-full">
+                                            <i data-lucide="trash-2" class="h-8 w-8 text-orange-600"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-purple-50 p-6 rounded-lg border border-purple-200">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <p class="text-purple-600 text-sm font-medium">Efficiency</p>
+                                            <p class="text-3xl font-bold text-purple-800">94%</p>
+                                            <p class="text-purple-600 text-sm">This Week</p>
+                                        </div>
+                                        <div class="bg-purple-100 p-3 rounded-full">
+                                            <i data-lucide="trending-up" class="h-8 w-8 text-purple-600"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div class="bg-gradient-to-r from-green-500 to-blue-500 p-6 rounded-lg text-white">
+                                    <h3 class="text-xl font-bold mb-2">🌍 Environmental Impact</h3>
+                                    <p class="mb-4">This month: 450 tons recycled, 2.1 tons hazardous waste processed safely.</p>
+                                    <button class="bg-white text-green-700 px-6 py-2 rounded-lg font-semibold hover:bg-gray-100">
+                                        View Full Report
+                                    </button>
+                                </div>
+                                
+                                <div class="bg-gradient-to-r from-purple-500 to-pink-500 p-6 rounded-lg text-white">
+                                    <h3 class="text-xl font-bold mb-2">📊 System Status</h3>
+                                    <p class="mb-4">All systems operational. 18 active routes, 3 pending approvals.</p>
+                                    <button class="bg-white text-purple-700 px-6 py-2 rounded-lg font-semibold hover:bg-gray-100">
+                                        System Monitor
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `,
+                    collectors: () => `
+                        <div class="bg-white p-8 rounded-xl border shadow-sm">
+                            <div class="flex justify-between items-center mb-6">
+                                <h1 class="text-3xl font-bold">Manage Collectors</h1>
+                                <button class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
+                                    Add New Collector
+                                </button>
+                            </div>
+                            
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="text-left p-4 font-semibold">Name</th>
+                                            <th class="text-left p-4 font-semibold">Contact</th>
+                                            <th class="text-left p-4 font-semibold">Truck</th>
+                                            <th class="text-left p-4 font-semibold">Zone</th>
+                                            <th class="text-left p-4 font-semibold">Status</th>
+                                            <th class="text-left p-4 font-semibold">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200">
+                                        <tr>
+                                            <td class="p-4">
+                                                <div class="flex items-center gap-3">
+                                                    <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face" alt="John Smith" class="w-10 h-10 rounded-full">
+                                                    <div>
+                                                        <p class="font-semibold">John Smith</p>
+                                                        <p class="text-sm text-gray-600">ID: COL001</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="p-4">
+                                                <p>+91 98765 43210</p>
+                                                <p class="text-sm text-gray-600">john.smith@smartbin.com</p>
+                                            </td>
+                                            <td class="p-4">
+                                                <p class="font-semibold">TR-101</p>
+                                                <p class="text-sm text-gray-600">Capacity: 5 tons</p>
+                                            </td>
+                                            <td class="p-4">
+                                                <span class="bg-blue-100 text-blue-800 text-sm px-2 py-1 rounded">Zone A</span>
+                                            </td>
+                                            <td class="p-4">
+                                                <span class="bg-green-100 text-green-800 text-sm px-2 py-1 rounded">Active</span>
+                                            </td>
+                                            <td class="p-4">
+                                                <div class="flex gap-2">
+                                                    <button class="text-blue-600 hover:text-blue-800">Edit</button>
+                                                    <button class="text-red-600 hover:text-red-800">Suspend</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="p-4">
+                                                <div class="flex items-center gap-3">
+                                                    <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=40&h=40&fit=crop&crop=face" alt="Mike Johnson" class="w-10 h-10 rounded-full">
+                                                    <div>
+                                                        <p class="font-semibold">Mike Johnson</p>
+                                                        <p class="text-sm text-gray-600">ID: COL002</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="p-4">
+                                                <p>+91 87654 32109</p>
+                                                <p class="text-sm text-gray-600">mike.johnson@smartbin.com</p>
+                                            </td>
+                                            <td class="p-4">
+                                                <p class="font-semibold">TR-102</p>
+                                                <p class="text-sm text-gray-600">Capacity: 7 tons</p>
+                                            </td>
+                                            <td class="p-4">
+                                                <span class="bg-green-100 text-green-800 text-sm px-2 py-1 rounded">Zone B</span>
+                                            </td>
+                                            <td class="p-4">
+                                                <span class="bg-green-100 text-green-800 text-sm px-2 py-1 rounded">Active</span>
+                                            </td>
+                                            <td class="p-4">
+                                                <div class="flex gap-2">
+                                                    <button class="text-blue-600 hover:text-blue-800">Edit</button>
+                                                    <button class="text-red-600 hover:text-red-800">Suspend</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="p-4">
+                                                <div class="flex items-center gap-3">
+                                                    <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=40&h=40&fit=crop&crop=face" alt="David Wilson" class="w-10 h-10 rounded-full">
+                                                    <div>
+                                                        <p class="font-semibold">David Wilson</p>
+                                                        <p class="text-sm text-gray-600">ID: COL003</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="p-4">
+                                                <p>+91 76543 21098</p>
+                                                <p class="text-sm text-gray-600">david.wilson@smartbin.com</p>
+                                            </td>
+                                            <td class="p-4">
+                                                <p class="font-semibold">TR-103</p>
+                                                <p class="text-sm text-gray-600">Capacity: 5 tons</p>
+                                            </td>
+                                            <td class="p-4">
+                                                <span class="bg-purple-100 text-purple-800 text-sm px-2 py-1 rounded">Zone C</span>
+                                            </td>
+                                            <td class="p-4">
+                                                <span class="bg-yellow-100 text-yellow-800 text-sm px-2 py-1 rounded">On Leave</span>
+                                            </td>
+                                            <td class="p-4">
+                                                <div class="flex gap-2">
+                                                    <button class="text-blue-600 hover:text-blue-800">Edit</button>
+                                                    <button class="text-green-600 hover:text-green-800">Activate</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `,
+                    residents: () => `
+                        <div class="bg-white p-8 rounded-xl border shadow-sm">
+                            <h1 class="text-3xl font-bold mb-6">Approve Residents</h1>
+                            
+                            <div class="space-y-4">
+                                <div class="bg-yellow-50 border border-yellow-200 p-6 rounded-lg">
+                                    <div class="flex justify-between items-start">
+                                        <div class="flex items-center gap-4">
+                                            <img src="https://images.unsplash.com/photo-1494790108755-2616b612e2eb?w=60&h=60&fit=crop&crop=face" alt="Sarah Davis" class="w-15 h-15 rounded-full">
+                                            <div>
+                                                <h3 class="font-semibold text-lg">Sarah Davis</h3>
+                                                <p class="text-gray-600">sarah.davis@email.com</p>
+                                                <p class="text-sm text-gray-500">+91 65432 10987</p>
+                                                <p class="text-sm text-gray-500">123 Maple Street, Apartment 4B</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-3">
+                                            <button class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                                                Approve
+                                            </button>
+                                            <button class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+                                                Reject
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="mt-4 pt-4 border-t border-yellow-200">
+                                        <p class="text-sm text-gray-600">Applied: Sep 20, 2025 • Document Status: Verified</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-blue-50 border border-blue-200 p-6 rounded-lg">
+                                    <div class="flex justify-between items-start">
+                                        <div class="flex items-center gap-4">
+                                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=60&h=60&fit=crop&crop=face" alt="Robert Brown" class="w-15 h-15 rounded-full">
+                                            <div>
+                                                <h3 class="font-semibold text-lg">Robert Brown</h3>
+                                                <p class="text-gray-600">robert.brown@email.com</p>
+                                                <p class="text-sm text-gray-500">+91 54321 09876</p>
+                                                <p class="text-sm text-gray-500">456 Pine Avenue, House 12</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-3">
+                                            <button class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                                                Approve
+                                            </button>
+                                            <button class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+                                                Reject
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="mt-4 pt-4 border-t border-blue-200">
+                                        <p class="text-sm text-gray-600">Applied: Sep 22, 2025 • Document Status: Pending Verification</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-green-50 border border-green-200 p-6 rounded-lg">
+                                    <div class="flex justify-between items-start">
+                                        <div class="flex items-center gap-4">
+                                            <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=60&h=60&fit=crop&crop=face" alt="Lisa Anderson" class="w-15 h-15 rounded-full">
+                                            <div>
+                                                <h3 class="font-semibold text-lg">Lisa Anderson</h3>
+                                                <p class="text-gray-600">lisa.anderson@email.com</p>
+                                                <p class="text-sm text-gray-500">+91 43210 98765</p>
+                                                <p class="text-sm text-gray-500">789 Oak Drive, Villa 8</p>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <span class="bg-green-100 text-green-800 px-4 py-2 rounded text-sm font-medium">
+                                                ✓ Approved
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="mt-4 pt-4 border-t border-green-200">
+                                        <p class="text-sm text-gray-600">Approved: Sep 23, 2025 • Account Status: Active</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `,
+                    tracking: () => `
+                        <div class="bg-white p-8 rounded-xl border shadow-sm">
+                            <h1 class="text-3xl font-bold mb-6">Live Fleet Tracking</h1>
+                            
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <div>
+                                    <img src="https://images.unsplash.com/photo-1572949645841-094f3927814b?w=600&h=400&fit=crop" alt="Live Map" class="w-full rounded-lg shadow-lg">
+                                </div>
+                                
+                                <div class="space-y-4">
+                                    <h3 class="text-xl font-semibold">Active Vehicles</h3>
+                                    
+                                    <div class="bg-green-50 border border-green-200 p-4 rounded-lg">
+                                        <div class="flex justify-between items-center">
+                                            <div>
+                                                <p class="font-semibold">TR-101 (John Smith)</p>
+                                                <p class="text-sm text-gray-600">Zone A - Green Street</p>
+                                                <p class="text-sm text-green-600">Status: Collecting</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="text-sm text-gray-600">Speed: 15 km/h</p>
+                                                <p class="text-sm text-gray-600">Fuel: 82%</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                                        <div class="flex justify-between items-center">
+                                            <div>
+                                                <p class="font-semibold">TR-102 (Mike Johnson)</p>
+                                                <p class="text-sm text-gray-600">Zone B - Park Avenue</p>
+                                                <p class="text-sm text-blue-600">Status: En Route</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="text-sm text-gray-600">Speed: 35 km/h</p>
+                                                <p class="text-sm text-gray-600">Fuel: 67%</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="bg-gray-50 border border-gray-200 p-4 rounded-lg">
+                                        <div class="flex justify-between items-center">
+                                            <div>
+                                                <p class="font-semibold">TR-103 (David Wilson)</p>
+                                                <p class="text-sm text-gray-600">Zone C - Oak Street</p>
+                                                <p class="text-sm text-gray-600">Status: Parked</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="text-sm text-gray-600">Speed: 0 km/h</p>
+                                                <p class="text-sm text-gray-600">Fuel: 45%</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mt-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                                        <h4 class="font-semibold text-purple-800 mb-2">Fleet Summary</h4>
+                                        <div class="grid grid-cols-2 gap-4 text-sm">
+                                            <div>
+                                                <p class="text-purple-600">Active Vehicles</p>
+                                                <p class="font-bold text-purple-800">3/5</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-purple-600">Total Distance</p>
+                                                <p class="font-bold text-purple-800">142 km</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-purple-600">Avg Fuel</p>
+                                                <p class="font-bold text-purple-800">65%</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-purple-600">Efficiency</p>
+                                                <p class="font-bold text-purple-800">94%</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `,
+                    analytics: () => `
+                        <div class="bg-white p-8 rounded-xl border shadow-sm">
+                            <h1 class="text-3xl font-bold mb-6">Waste Analytics</h1>
+                            
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <div>
+                                    <h3 class="text-xl font-semibold mb-4">Waste Collection Breakdown</h3>
+                                    <canvas id="waste-chart" width="400" height="300"></canvas>
+                                </div>
+                                
+                                <div>
+                                    <h3 class="text-xl font-semibold mb-4">Monthly Trends</h3>
+                                    <div class="space-y-4">
+                                        <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                                            <div class="flex justify-between items-center">
+                                                <div>
+                                                    <p class="text-green-600 text-sm font-medium">Wet Waste</p>
+                                                    <p class="text-2xl font-bold text-green-800">145 tons</p>
+                                                    <p class="text-green-600 text-sm">+12% from last month</p>
+                                                </div>
+                                                <div class="text-green-600">📈</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                                            <div class="flex justify-between items-center">
+                                                <div>
+                                                    <p class="text-blue-600 text-sm font-medium">Dry Waste</p>
+                                                    <p class="text-2xl font-bold text-blue-800">89 tons</p>
+                                                    <p class="text-blue-600 text-sm">+8% from last month</p>
+                                                </div>
+                                                <div class="text-blue-600">📊</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="bg-red-50 p-4 rounded-lg border border-red-200">
+                                            <div class="flex justify-between items-center">
+                                                <div>
+                                                    <p class="text-red-600 text-sm font-medium">Hazardous</p>
+                                                    <p class="text-2xl font-bold text-red-800">23 tons</p>
+                                                    <p class="text-red-600 text-sm">-5% from last month</p>
+                                                </div>
+                                                <div class="text-red-600">⚠️</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                                            <div class="flex justify-between items-center">
+                                                <div>
+                                                    <p class="text-purple-600 text-sm font-medium">E-Waste</p>
+                                                    <p class="text-2xl font-bold text-purple-800">12 tons</p>
+                                                    <p class="text-purple-600 text-sm">+25% from last month</p>
+                                                </div>
+                                                <div class="text-purple-600">💻</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div class="bg-gradient-to-r from-green-500 to-blue-500 p-6 rounded-lg text-white text-center">
+                                    <h4 class="text-lg font-semibold mb-2">Collection Efficiency</h4>
+                                    <p class="text-3xl font-bold">94.2%</p>
+                                    <p class="text-sm opacity-90">This month</p>
+                                </div>
+                                
+                                <div class="bg-gradient-to-r from-purple-500 to-pink-500 p-6 rounded-lg text-white text-center">
+                                    <h4 class="text-lg font-semibold mb-2">Recycling Rate</h4>
+                                    <p class="text-3xl font-bold">67.8%</p>
+                                    <p class="text-sm opacity-90">Total waste</p>
+                                </div>
+                                
+                                <div class="bg-gradient-to-r from-orange-500 to-red-500 p-6 rounded-lg text-white text-center">
+                                    <h4 class="text-lg font-semibold mb-2">Cost Savings</h4>
+                                    <p class="text-3xl font-bold">₹2.4L</p>
+                                    <p class="text-sm opacity-90">This month</p>
+                                </div>
+                            </div>
+                        </div>
+                    `
+                }
+            };
+
+            if (content[role] && content[role][page]) {
+                mainContent.innerHTML = content[role][page]();
+                
+                // Initialize charts if on analytics page
+                if (role === 'admin' && page === 'analytics') {
+                    setTimeout(initWasteChart, 100);
+                }
+                
+                lucide.createIcons();
+            } else {
+                mainContent.innerHTML = '<h1 class="text-2xl font-bold text-red-500">Page not found.</h1>';
+            }
+        }
+
+        function initWasteChart() {
+            const ctx = document.getElementById('waste-chart');
+            if (ctx) {
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Wet Waste', 'Dry Waste', 'Hazardous', 'E-Waste'],
+                        datasets: [{
+                            data: [145, 89, 23, 12],
+                            backgroundColor: ['#10B981', '#3B82F6', '#EF4444', '#8B5CF6'],
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            currentRole = null;
+            showPage('landing-page');
+            showToast('You have been logged out.');
+        }
+
+        // Segregation Game Functions
+        function setupSegregationGame() {
+            resetGame();
+        }
+
+        function showGameModal() {
+            document.getElementById('game-modal').classList.remove('hidden');
+            document.getElementById('game-modal').classList.add('flex');
+            resetGame();
+        }
+
+        function hideGameModal() {
+            document.getElementById('game-modal').classList.add('hidden');
+            document.getElementById('game-modal').classList.remove('flex');
+        }
+
+        function resetGame() {
+            gameScore = 0;
+            gameItems = [...wasteItems];
+            updateGameUI();
+            populateWasteItems();
+        }
+
+        function updateGameUI() {
+            document.getElementById('game-score').textContent = gameScore;
+            document.getElementById('items-count').textContent = gameItems.length;
+            
+            const status = document.getElementById('game-status');
+            if (gameItems.length === 0) {
+                status.textContent = '🎉 Congratulations! You\'ve sorted all items!';
+            } else {
+                status.textContent = 'Drag items to the correct bins';
+            }
+        }
+
+        function populateWasteItems() {
+            const container = document.getElementById('waste-items');
+            if (gameItems.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-500 py-8">All items sorted! 🎉</div>';
+                return;
+            }
+
+            container.innerHTML = gameItems.map(item => `
+                <div class="waste-item bg-white p-3 rounded-lg shadow cursor-grab flex items-center gap-3 border" 
+                     draggable="true" 
+                     data-item-id="${item.id}" 
+                     data-type="${item.type}">
+                    <span class="text-2xl">${item.emoji}</span>
+                    <span class="font-medium">${item.name}</span>
+                </div>
+            `).join('');
+
+            // Add drag event listeners
+            const wasteItemElements = container.querySelectorAll('.waste-item');
+            wasteItemElements.forEach(item => {
+                item.addEventListener('dragstart', handleDragStart);
+                item.addEventListener('dragend', handleDragEnd);
+            });
+        }
+
+        function handleDragStart(e) {
+            e.target.classList.add('opacity-50');
+            e.dataTransfer.setData('text/plain', e.target.dataset.itemId);
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('opacity-50');
+        }
+
+        // Setup drop zones
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                const dropZones = document.querySelectorAll('.drop-zone');
+                dropZones.forEach(zone => {
+                    zone.addEventListener('dragover', handleDragOver);
+                    zone.addEventListener('dragenter', handleDragEnter);
+                    zone.addEventListener('dragleave', handleDragLeave);
+                    zone.addEventListener('drop', handleDrop);
+                });
+            }, 1000);
+        });
+
+        function handleDragOver(e) {
+            e.preventDefault();
+        }
+
+        function handleDragEnter(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+            
+            const itemId = parseInt(e.dataTransfer.getData('text/plain'));
+            const binType = e.currentTarget.dataset.bin;
+            const item = gameItems.find(i => i.id === itemId);
+            
+            if (!item) return;
+
+            const feedbackEl = document.getElementById('game-feedback');
+            feedbackEl.classList.remove('hidden');
+
+            if (item.type === binType) {
+                // Correct placement
+                gameScore += 10;
+                gameItems = gameItems.filter(i => i.id !== itemId);
+                feedbackEl.innerHTML = '<span class="text-green-600 font-semibold">✅ Correct! ' + item.name + ' goes in ' + binType + ' waste.</span>';
+                e.currentTarget.classList.add('correct-drop');
+                setTimeout(() => e.currentTarget.classList.remove('correct-drop'), 500);
+            } else {
+                // Wrong placement
+                feedbackEl.innerHTML = '<span class="text-red-600 font-semibold">❌ Oops! ' + item.name + ' should go in ' + item.type + ' waste bin.</span>';
+                e.currentTarget.classList.add('wrong-drop');
+                setTimeout(() => e.currentTarget.classList.remove('wrong-drop'), 500);
+            }
+
+            updateGameUI();
+            populateWasteItems();
+            
+            setTimeout(() => {
+                feedbackEl.classList.add('hidden');
+            }, 3000);
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const isError = type === 'error';
+            
+            toast.innerHTML = `
+                <div class="${isError ? 'bg-red-600' : 'bg-gray-800'} text-white py-3 px-6 rounded-lg shadow-2xl flex items-center gap-3">
+                    <i data-lucide="${isError ? 'alert-triangle' : 'check-circle'}" class="h-6 w-6 ${isError ? 'text-white' : 'text-green-400'}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            lucide.createIcons();
+            toast.classList.remove('hidden');
+            
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 4000);
+        }
+    </script>
+</body>
+</html>
