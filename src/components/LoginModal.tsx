@@ -51,7 +51,7 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }: LoginModalProps) => {
     }
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const API_URL = import.meta.env.VITE_API_URL || '';
       const endpoint = `${API_URL}/auth.php?action=${isRegister ? 'register' : 'login'}`;
       const response = await fetch(endpoint, {
         method: 'POST',

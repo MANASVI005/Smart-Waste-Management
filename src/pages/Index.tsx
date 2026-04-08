@@ -17,7 +17,7 @@ const Index = () => {
   useEffect(() => {
     // Check for existing session on mount
     const checkSession = async () => {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const API_URL = import.meta.env.VITE_API_URL || '';
       try {
         const response = await fetch(`${API_URL}/auth.php?action=status`, {
           credentials: 'include',

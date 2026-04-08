@@ -22,7 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import MapComponent from "./MapComponent";
 import smartBinLogo from "@/assets/smart-bin-logo.png";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const CollectorDashboard = ({ onLogout, user }: { onLogout?: () => void; user?: { name: string; email: string; role: string } }) => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -63,7 +63,7 @@ const CollectorDashboard = ({ onLogout, user }: { onLogout?: () => void; user?: 
 
   const handleUpdateStatus = async (requestId: number, status: string) => {
     try {
-      const response = await fetch('http://localhost:8000/api.php?action=update-pickup-status', {
+      const response = await fetch(`${API_URL}/api.php?action=update-pickup-status`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -210,11 +210,23 @@ const CollectorDashboard = ({ onLogout, user }: { onLogout?: () => void; user?: 
                   </Button>
                   <Button 
                     variant="outline"
-                    onClick={() => {
-                      toast({
-                        title: "Collection Started",
-                        description: "Your assigned route is now active. markers are visible on the map.",
-                      });
+                    onClick={async () => {
+                      try {
+                        const response = await fetch(`${API_URL}/api.php?action=start-collection`, {
+                          method: 'POST',
+                          credentials: 'include'
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                          toast({
+                            title: "Collection Started",
+                            description: "Your assigned route is now active.",
+                          });
+                          fetchData();
+                        }
+                      } catch (error) {
+                        toast({ title: "Failed to start collection", variant: "destructive" });
+                      }
                     }}
                     className="bg-[#2563eb] text-white hover:bg-[#1d4ed8] border-none font-bold px-8 py-7 text-lg rounded-2xl transition-all shadow-lg hover:shadow-blue-500/20 active:scale-95"
                   >
@@ -278,18 +290,38 @@ const CollectorDashboard = ({ onLogout, user }: { onLogout?: () => void; user?: 
                          </div>
                       ) : (
                         <div className="flex flex-col gap-2 w-full">
-                          <Button 
-                            onClick={() => handleUpdateStatus(request.id, 'enroute')}
-                            className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-black px-10 py-4 text-md rounded-2xl shadow-lg border-none active:scale-95 transition-all w-full"
-                          >
-                            Enroute
-                          </Button>
-                          <Button 
-                            onClick={() => handleUpdateStatus(request.id, 'completed')}
-                            className="bg-[#22c55e] hover:bg-[#16a34a] text-white font-black px-10 py-4 text-md rounded-2xl shadow-lg border-none active:scale-95 transition-all w-full"
-                          >
-                            Accept
-                          </Button>
+                          {request.status === 'pending' && (
+                            <>
+                              <Button 
+                                onClick={() => handleUpdateStatus(request.id, 'accepted')}
+                                className="bg-[#22c55e] hover:bg-[#16a34a] text-white font-black px-10 py-4 text-md rounded-2xl shadow-lg border-none active:scale-95 transition-all w-full"
+                              >
+                                Accept
+                              </Button>
+                              <Button 
+                                onClick={() => handleUpdateStatus(request.id, 'rejected')}
+                                className="bg-red-500 hover:bg-red-600 text-white font-black px-10 py-4 text-md rounded-2xl shadow-lg border-none active:scale-95 transition-all w-full"
+                              >
+                                Reject
+                              </Button>
+                            </>
+                          )}
+                          {request.status === 'accepted' && (
+                            <Button 
+                              onClick={() => handleUpdateStatus(request.id, 'enroute')}
+                              className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-black px-10 py-4 text-md rounded-2xl shadow-lg border-none active:scale-95 transition-all w-full"
+                            >
+                              Start Navigation (Enroute)
+                            </Button>
+                          )}
+                          {request.status === 'enroute' && (
+                            <Button 
+                              onClick={() => handleUpdateStatus(request.id, 'completed')}
+                              className="bg-[#166534] hover:bg-[#15803d] text-white font-black px-10 py-4 text-md rounded-2xl shadow-lg border-none active:scale-95 transition-all w-full"
+                            >
+                              Mark as Completed
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>

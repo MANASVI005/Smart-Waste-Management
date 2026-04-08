@@ -28,7 +28,7 @@ const DemoAuthWrapper = ({ initialUser }: DemoAuthWrapperProps) => {
     if (initialUser) return;
 
     const checkAuthStatus = async () => {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const API_URL = import.meta.env.VITE_API_URL || '';
       try {
         const response = await fetch(`${API_URL}/auth.php?action=status`, {
           credentials: 'include',
@@ -49,7 +49,7 @@ const DemoAuthWrapper = ({ initialUser }: DemoAuthWrapperProps) => {
   }, [initialUser]);
 
   const handleLogout = async () => {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    const API_URL = import.meta.env.VITE_API_URL || '';
     try {
       await fetch(`${API_URL}/auth.php?action=logout`, {
         credentials: 'include'
@@ -106,10 +106,10 @@ const DemoAuthWrapper = ({ initialUser }: DemoAuthWrapperProps) => {
             <ResidentDashboard onLogout={handleLogout} user={currentUser as { id?: number; name: string; email: string; role: string }} />
           )}
           {currentUser.role === 'collector' && (
-            <CollectorDashboard user={currentUser as { name: string; email: string; role: string }} />
+            <CollectorDashboard onLogout={handleLogout} user={currentUser as { name: string; email: string; role: string }} />
           )}
           {currentUser.role === 'admin' && (
-            <AdminDashboard user={currentUser as { name: string; email: string; role: string }} />
+            <AdminDashboard onLogout={handleLogout} user={currentUser as { name: string; email: string; role: string }} />
           )}
         </main>
       </div>

@@ -39,7 +39,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import MapComponent from "./MapComponent";
 import smartBinLogo from "@/assets/smart-bin-logo.png";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const AdminDashboard = ({ onLogout, user }: { onLogout?: () => void; user?: { name: string; email: string; role: string } }) => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -48,6 +48,7 @@ const AdminDashboard = ({ onLogout, user }: { onLogout?: () => void; user?: { na
   const [allPickups, setAllPickups] = useState<any[]>([]);
   const [residents, setResidents] = useState<any[]>([]);
   const [collectors, setCollectors] = useState<any[]>([]);
+  const [collectorRequests, setCollectorRequests] = useState<any[]>([]);
   const [analytics, setAnalytics] = useState<any>(null);
   const [mapFocus, setMapFocus] = useState<[number, number] | undefined>(undefined);
   
@@ -59,19 +60,23 @@ const AdminDashboard = ({ onLogout, user }: { onLogout?: () => void; user?: { na
       const headers = { 'X-Requested-With': 'XMLHttpRequest' };
       const options = { credentials: 'include' as const, headers };
 
-      const [pRes, rRes, cRes, aRes] = await Promise.all([
+      const [pRes, rRes, cRes, aRes, crRes] = await Promise.all([
         fetch(`${API_URL}/api.php?action=get-all-pickups`, options),
         fetch(`${API_URL}/api.php?action=get-residents`, options),
         fetch(`${API_URL}/api.php?action=get-all-collectors`, options),
-        fetch(`${API_URL}/api.php?action=get-analytics`, options)
+        fetch(`${API_URL}/api.php?action=get-all-stats`, options),
+        fetch(`${API_URL}/api.php?action=get-collector-requests`, options)
       ]);
 
-      const [pJson, rJson, cJson, aJson] = await Promise.all([pRes.json(), rRes.json(), cRes.json(), aRes.json()]);
+      const [pJson, rJson, cJson, aJson, crJson] = await Promise.all([
+        pRes.json(), rRes.json(), cRes.json(), aRes.json(), crRes.json()
+      ]);
 
       if (pJson.success) setAllPickups(pJson.pickups);
       if (rJson.success) setResidents(rJson.residents);
       if (cJson.success) setCollectors(cJson.collectors);
-      if (aJson.success) setAnalytics(aJson);
+      if (aJson.success) setAnalytics(aJson.stats);
+      if (crJson.success) setCollectorRequests(crJson.requests);
 
     } catch (error) {
       console.error("Failed to fetch admin data:", error);
@@ -90,7 +95,7 @@ const AdminDashboard = ({ onLogout, user }: { onLogout?: () => void; user?: { na
 
   const handleUpdateResidentStatus = async (residentId: number, status: string) => {
     try {
-      const response = await fetch('http://localhost:8000/api.php?action=update-resident-status', {
+      const response = await fetch(`${API_URL}/api.php?action=update-resident-status`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -108,7 +113,7 @@ const AdminDashboard = ({ onLogout, user }: { onLogout?: () => void; user?: { na
 
   const handleAddCollector = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api.php?action=add-collector', {
+      const response = await fetch(`${API_URL}/api.php?action=add-collector`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -176,23 +181,23 @@ const AdminDashboard = ({ onLogout, user }: { onLogout?: () => void; user?: { na
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <Card className="bg-[#f0fdf4] border-2 border-[#dcfce7] rounded-3xl p-6">
                   <p className="text-[#15803d] text-sm font-black uppercase tracking-widest mb-1">Active Collectors</p>
-                  <h3 className="text-4xl font-black text-[#166534]">{collectors.filter(c => c.status === 'Active').length}</h3>
+                  <h3 className="text-4xl font-black text-[#166534]">{analytics?.collectors ?? 0}</h3>
                   <Badge className="bg-[#22c55e] text-white mt-2">ON DUTY</Badge>
                 </Card>
                 <Card className="bg-[#eff6ff] border-2 border-[#dbeafe] rounded-3xl p-6">
                   <p className="text-[#1d4ed8] text-sm font-black uppercase tracking-widest mb-1">Residents</p>
-                  <h3 className="text-4xl font-black text-[#1e3a8a]">{residents.length}</h3>
+                  <h3 className="text-4xl font-black text-[#1e3a8a]">{analytics?.residents ?? 0}</h3>
                   <Badge className="bg-[#3b82f6] text-white mt-2">REGISTERED</Badge>
                 </Card>
                 <Card className="bg-[#fff7ed] border-2 border-[#ffedd5] rounded-3xl p-6">
-                  <p className="text-[#c2410c] text-sm font-black uppercase tracking-widest mb-1">Daily Waste</p>
-                  <h3 className="text-4xl font-black text-[#9a3412]">15.2</h3>
-                  <Badge className="bg-[#f97316] text-white mt-2">TONS</Badge>
+                  <p className="text-[#c2410c] text-sm font-black uppercase tracking-widest mb-1">Completed</p>
+                  <h3 className="text-4xl font-black text-[#9a3412]">{analytics?.total_pickups ?? 0}</h3>
+                  <Badge className="bg-[#f97316] text-white mt-2">PICKUPS</Badge>
                 </Card>
                 <Card className="bg-[#faf5ff] border-2 border-[#f3e8ff] rounded-3xl p-6">
                   <p className="text-[#7e22ce] text-sm font-black uppercase tracking-widest mb-1">Efficiency</p>
-                  <h3 className="text-4xl font-black text-[#581c87]">94%</h3>
-                  <Badge className="bg-[#a855f7] text-white mt-2">THIS WEEK</Badge>
+                  <h3 className="text-4xl font-black text-[#581c87]">{analytics?.efficiency ?? 94}%</h3>
+                  <Badge className="bg-[#a855f7] text-white mt-2">TARGET SET</Badge>
                 </Card>
               </div>
 
@@ -220,6 +225,28 @@ const AdminDashboard = ({ onLogout, user }: { onLogout?: () => void; user?: { na
                   <Plus className="mr-2" /> Add New Collector
                 </Button>
               </div>
+              
+              {collectorRequests.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-xl font-bold text-orange-600 flex items-center gap-2 animate-pulse"><Clock /> Pending Signups</h3>
+                  <Card className="rounded-[32px] overflow-hidden border-2 border-orange-100 shadow-sm bg-orange-50/20">
+                    <table className="w-full text-left">
+                      <tbody className="divide-y divide-orange-100">
+                        {collectorRequests.map(req => (
+                          <tr key={req.id}>
+                            <td className="px-8 py-4 font-bold">{req.name}</td>
+                            <td className="px-8 py-4 text-gray-500">{req.email}</td>
+                            <td className="px-8 py-4">
+                              <Button onClick={() => handleUpdateResidentStatus(req.id, 'Active')} className="bg-orange-500 text-white rounded-xl">Approve</Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </Card>
+                </div>
+              )}
+
               <Card className="rounded-[32px] overflow-hidden border-none shadow-sm">
                 <table className="w-full text-left">
                   <thead className="bg-gray-50 text-gray-400 text-xs font-black uppercase tracking-widest">

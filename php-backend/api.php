@@ -74,7 +74,7 @@ switch ($action) {
             break;
         }
         $db = get_db_connection();
-        $stmt = $db->prepare("SELECT p.*, u.name as resident_name, u.email as resident_email FROM pickups p JOIN users u ON p.user_id = u.id ORDER BY p.created_at DESC");
+        $stmt = $db->prepare("SELECT p.*, u.name as resident_name, u.email as resident_email, u.phone as resident_phone FROM pickups p JOIN users u ON p.user_id = u.id ORDER BY p.created_at DESC");
         $stmt->execute();
         $pickups = $stmt->fetchAll();
         echo json_encode(['success' => true, 'pickups' => $pickups]);
@@ -273,6 +273,64 @@ switch ($action) {
                 echo json_encode(['error' => 'Failed to update resident status']);
             }
         }
+        break;
+
+    case 'start-collection':
+        if ($user['role'] !== 'collector' && $user['role'] !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Access denied']);
+            break;
+        }
+        $db = get_db_connection();
+        $stmt = $db->prepare("UPDATE routes SET status = 'in-progress' WHERE collector_id = ? AND status = 'pending'");
+        if ($stmt->execute([$user['id']])) {
+            echo json_encode(['success' => true]);
+        } else {
+            http_response_code(500);
+            echo json_encode(['error' => 'Failed to start collection']);
+        }
+        break;
+
+    case 'get-all-stats':
+        if ($user['role'] !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Access denied']);
+            break;
+        }
+        $db = get_db_connection();
+        
+        // General counts
+        $uCount = $db->query("SELECT COUNT(*) FROM users WHERE role = 'resident'")->fetchColumn();
+        $cCount = $db->query("SELECT COUNT(*) FROM users WHERE role = 'collector' AND status = 'Active'")->fetchColumn();
+        $pCount = $db->query("SELECT COUNT(*) FROM pickups WHERE status = 'completed'")->fetchColumn();
+        
+        // Waste by type (for donut chart)
+        $wStmt = $db->query("SELECT type, COUNT(*) as count FROM pickups GROUP BY type");
+        $waste_breakdown = $wStmt->fetchAll();
+
+        echo json_encode([
+            'success' => true,
+            'stats' => [
+                'collectors' => $cCount,
+                'residents' => $uCount,
+                'total_pickups' => $pCount,
+                'efficiency' => 94, // Mock for now
+                'waste_breakdown' => $waste_breakdown
+            ]
+        ]);
+        break;
+
+    case 'get-collector-requests':
+        if ($user['role'] !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Access denied']);
+            break;
+        }
+        $db = get_db_connection();
+        $stmt = $db->prepare("SELECT id, name, email, phone, status, created_at FROM users WHERE role = 'collector' AND status = 'pending' ORDER BY created_at DESC");
+        $stmt->execute();
+        $requests = $stmt->fetchAll();
+        echo json_encode(['success' => true, 'requests' => $requests]);
         break;
 
     default:

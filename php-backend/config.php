@@ -2,7 +2,7 @@
 // PHP Backend Configuration
 
 // Database configuration
-define('DB_HOST', 'localhost');
+define('DB_HOST', '127.0.0.1');
 define('DB_USER', 'root');
 define('DB_PASS', ''); // Default MySQL password for root is empty
 define('DB_NAME', 'smart_bin');
