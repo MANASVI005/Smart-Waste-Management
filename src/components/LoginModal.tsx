@@ -68,19 +68,21 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }: LoginModalProps) => {
       if (response.ok && result.success) {
         toast({
           title: isRegister ? "Registration Successful!" : "Login Successful!",
-          description: `Welcome ${result.user.name}!`,
+          description: `Welcome ${result.user?.name || 'User'}!`,
         });
         onClose();
-        if (onLoginSuccess) {
+        if (onLoginSuccess && result.user && result.user.role) {
           onLoginSuccess(
             result.user.role as "resident" | "collector" | "admin",
             {
               id: result.user.id,
-              name: result.user.name,
-              email: result.user.email,
+              name: result.user.name || "Unknown",
+              email: result.user.email || "",
               role: result.user.role as "resident" | "collector" | "admin",
             }
           );
+        } else {
+          throw new Error("Missing user data from server");
         }
       } else {
         toast({

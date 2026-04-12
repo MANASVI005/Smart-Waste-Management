@@ -24,7 +24,7 @@ const Index = () => {
           headers: { 'X-Requested-With': 'XMLHttpRequest' }
         });
         const result = await response.json();
-        if (result.loggedIn && result.user) {
+        if (result.loggedIn && result.user && result.user.role) {
           setLoggedInUser(result.user);
           setShowDemo(true);
         }
