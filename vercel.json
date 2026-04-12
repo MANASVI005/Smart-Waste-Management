@@ -6,12 +6,20 @@
   },
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/api.php?action=$1"
+      "src": "/setup",
+      "dest": "/api/setup.php"
     },
     {
-      "src": "/auth/(.*)",
-      "dest": "/api/auth.php?action=$1"
+      "src": "/auth.php",
+      "dest": "/api/auth.php"
+    },
+    {
+      "src": "/api.php",
+      "dest": "/api/api.php"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }
