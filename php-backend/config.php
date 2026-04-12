@@ -1,18 +1,17 @@
 <?php
 // PHP Backend Configuration
 
-// Database configuration
-define('DB_HOST', '127.0.0.1');
-define('DB_USER', 'root');
-define('DB_PASS', ''); // Default MySQL password for root is empty
-define('DB_NAME', 'smart_bin');
+// Database configuration - Uses Environment Variables in Production, Fallback to Localhost
+define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');
+define('DB_USER', getenv('DB_USER') ?: 'root');
+define('DB_PASS', getenv('DB_PASS') ?: '');
+define('DB_NAME', getenv('DB_NAME') ?: 'smart_bin');
 
-// CORS Headers to allow React to communicate with PHP
-$allowed_origin = 'http://localhost:8080';
-if (isset($_SERVER['HTTP_ORIGIN']) && $_SERVER['HTTP_ORIGIN'] === $allowed_origin) {
-    header("Access-Control-Allow-Origin: " . $allowed_origin);
+// CORS Headers - Automatically allow the current frontend origin
+if (isset($_SERVER['HTTP_ORIGIN'])) {
+    header("Access-Control-Allow-Origin: " . $_SERVER['HTTP_ORIGIN']);
 } else {
-    header("Access-Control-Allow-Origin: " . $allowed_origin);
+    header("Access-Control-Allow-Origin: *");
 }
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");

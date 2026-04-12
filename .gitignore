@@ -1,5 +1,20 @@
 node_modules
 dist
-.env.local
-.DS_Store
+dist-ssr
 *.local
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+
+# Lock files
+package-lock.json
+bun.lockb
+
+# Vercel
+.vercel
